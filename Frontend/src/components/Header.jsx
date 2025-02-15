@@ -82,7 +82,7 @@ export default function Header() {
       </Button>
       <div className="flex gap-2 md:order-2">
         <Button
-          className="w-12 h-10 hidden sm:inline relative"
+          className="w-12 h-10 sm:inline relative"
           color="gray"
           pill
           onClick={handleCartClick}
