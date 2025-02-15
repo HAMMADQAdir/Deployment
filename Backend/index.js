@@ -9,11 +9,14 @@ import reviewRoutes from "./routes/reviews.routes.js";
 import examRoutes from "./routes/exam.route.js";
 import subjectRoutes from "./routes/subject.route.js";
 import chapterRoutes from "./routes/chapter.route.js";
-import quizRoutes from  "./routes/quiz.routes.js"
+import quizRoutes from "./routes/quiz.routes.js";
 import cartRoutes from "./routes/cart.route.js";
 import orderRoutes from "./routes/order.route.js";
 import addressRoutes from "./routes/address.route.js";
 import bodyParser from "body-parser";
+
+import path from "path";
+
 dotenv.config();
 
 mongoose
@@ -24,6 +27,8 @@ mongoose
   .catch((err) => {
     console.log("Failed to connect to MongoDB", err);
   });
+
+const __dirname = path.resolve();
 
 const app = express();
 
@@ -53,7 +58,11 @@ app.use("/api/order", orderRoutes);
 // addresses
 app.use("/api/address", addressRoutes);
 
+app.use(express.static(path.join(__dirname, "/Frontend/dist")));
 
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "Frontend", "dist", "index.html"));
+});
 
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
