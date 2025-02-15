@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { Button, Navbar, TextInput, Dropdown, Avatar } from "flowbite-react";
 import { AiOutlineSearch } from "react-icons/ai";
 import { FaShoppingCart } from "react-icons/fa";
+import * as jwt_decode from "jwt-decode";
 import { signoutSuccess } from "../redux/user/userSlice";
 
 export default function Header() {
@@ -12,6 +13,22 @@ export default function Header() {
   const { currentUser } = useSelector((state) => state.user);
   const { items } = useSelector((state) => state.cart);
   const cartCount = currentUser ? items?.length || 0 : 0;
+
+  useEffect(() => {
+    if (currentUser && currentUser.token) {
+      try {
+        const decoded = jwt_decode.default(currentUser.token);
+        if (decoded.exp * 1000 < Date.now()) {
+          dispatch(signoutSuccess());
+          navigate("/sign-in");
+        }
+      } catch (error) {
+        console.error("Token decoding failed:", error);
+        dispatch(signoutSuccess());
+        navigate("/sign-in");
+      }
+    }
+  }, [currentUser, dispatch, navigate]);
 
   const handleSignout = async () => {
     try {
