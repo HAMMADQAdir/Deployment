@@ -1,10 +1,10 @@
-import React, { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { Button, Navbar, TextInput, Dropdown, Avatar } from "flowbite-react";
 import { AiOutlineSearch } from "react-icons/ai";
 import { FaShoppingCart } from "react-icons/fa";
-import * as jwt_decode from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 import { signoutSuccess } from "../redux/user/userSlice";
 
 export default function Header() {
@@ -13,41 +13,71 @@ export default function Header() {
   const { currentUser } = useSelector((state) => state.user);
   const { items } = useSelector((state) => state.cart);
   const cartCount = currentUser ? items?.length || 0 : 0;
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
-    if (currentUser && currentUser.token) {
-      try {
-        const decoded = jwt_decode.default(currentUser.token);
-        if (decoded.exp * 1000 < Date.now()) {
+    const checkSession = async () => {
+      if (currentUser?.token && currentUser?.sessionId) {
+        try {
+          const decoded = jwtDecode(currentUser.token);
+          const currentTime = Date.now() / 1000;
+
+          // Check both token expiration and sessionId
+          if (
+            decoded.exp < currentTime ||
+            decoded.sessionId !== currentUser.sessionId
+          ) {
+            // Session expired or invalid
+            setSessionExpired(true);
+            dispatch(signoutSuccess());
+            setTimeout(() => {
+              navigate("/sign-in");
+            }, 1500); // Give users time to see the expired message
+          } else {
+            setSessionExpired(false);
+          }
+        } catch (error) {
+          console.error("Token validation failed:", error);
+          setSessionExpired(true);
           dispatch(signoutSuccess());
           navigate("/sign-in");
         }
-      } catch (error) {
-        console.error("Token decoding failed:", error);
-        dispatch(signoutSuccess());
-        navigate("/sign-in");
       }
-    }
+    };
+
+    checkSession();
+    const interval = setInterval(checkSession, 30000); // Check every 30 seconds
+    return () => clearInterval(interval);
   }, [currentUser, dispatch, navigate]);
 
+  // Update handleSignout to handle sessionId
   const handleSignout = async () => {
     try {
-      const res = await fetch("/api/user/signout", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${currentUser.token}`,
-        },
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        console.log(data.message);
-      } else {
-        dispatch(signoutSuccess());
+      if (currentUser?.token && currentUser?.sessionId) {
+        const res = await fetch("/api/user/signout", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${currentUser.token}`,
+            "Session-ID": currentUser.sessionId, // Add sessionId to headers
+          },
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          console.log(data.message);
+        }
       }
+
+      dispatch(signoutSuccess());
+      setSessionExpired(false);
+      navigate("/sign-in");
     } catch (error) {
       console.log(error.message);
+      dispatch(signoutSuccess());
+      setSessionExpired(false);
+      navigate("/sign-in");
     }
   };
 
@@ -94,7 +124,7 @@ export default function Header() {
             </div>
           )}
         </Button>
-        {currentUser ? (
+        {currentUser && !sessionExpired ? (
           <Dropdown
             arrowIcon={false}
             inline
@@ -116,8 +146,19 @@ export default function Header() {
           </Dropdown>
         ) : (
           <Link to="/sign-in">
-            <Button gradientDuoTone="purpleToBlue" outline>
-              Sign In
+            <Button
+              gradientDuoTone="purpleToBlue"
+              outline
+              className={sessionExpired ? "border-red-500" : ""}
+            >
+              {sessionExpired ? (
+                <div className="flex flex-col items-center">
+                  <span className="text-red-500">Session Expired</span>
+                  <span className="text-xs">Click to Sign In</span>
+                </div>
+              ) : (
+                "Sign In"
+              )}
             </Button>
           </Link>
         )}
